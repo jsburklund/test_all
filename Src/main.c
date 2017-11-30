@@ -82,6 +82,7 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 
 /* USER CODE BEGIN 0 */
 uint32_t value;
+HAL_StatusTypeDef mystatus;
 /* USER CODE END 0 */
 
 int main(void)
@@ -122,9 +123,39 @@ int main(void)
   //uint8_t mytxbuf = {0xF0, 0xAA}
   uint8_t mytxbuf[] = {'a', 'b', 'c'};
   uint8_t myi2crxbuf[2];
+
+  HAL_UART_Transmit(&huart2, "HI THERE", 8, 500);
+  if(myi2crxbuf == NULL) {
+  HAL_UART_Transmit(&huart2, "Null", 4, 500); 
+   }
+
+  //I2C constants
+  uint16_t addr = 0x006BU<<1;
+  uint16_t reg = 0x000F;
   while (1) {
-    HAL_UART_Transmit(&huart2, mytxbuf, 3, 500);
-    HAL_I2C_Mem_Read(&hi2c1, 0xFFFFU, 0xFFAA, 1, myi2crxbuf, 2, 500);
+    myi2crxbuf[0] = 'n';
+    mystatus = HAL_I2C_Mem_Read(&hi2c1, addr, reg, 1, myi2crxbuf, 1, 500);
+    if (mystatus == HAL_OK) {
+      //Status OK, print out the received data
+      HAL_UART_Transmit(&huart2, "Stat OK\n\r", 9, 500);
+      HAL_UART_Transmit(&huart2, "Rec: ", 5, 500);
+      HAL_UART_Transmit(&huart2, myi2crxbuf, 1, 500);
+      HAL_UART_Transmit(&huart2, "\r\n", 2, 500);
+      HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_3);
+    } else if (mystatus == HAL_ERROR) {
+      //Error Status, print out the reason
+      uint8_t errcode = hi2c1.ErrorCode + '0';
+      HAL_UART_Transmit(&huart2, "ERROR_CODE ", 11, 500);
+      HAL_UART_Transmit(&huart2, &errcode, 1, 500);
+      HAL_UART_Transmit(&huart2, "\r\n", 2, 500);
+    } else if (mystatus == HAL_BUSY) {
+      HAL_UART_Transmit(&huart2, "Stat BUS\n\r", 10, 500);
+    } else if (mystatus == HAL_TIMEOUT) {
+      HAL_UART_Transmit(&huart2, "Stat TIM\n\r", 10, 500);
+    } else {
+      HAL_UART_Transmit(&huart2, "Stat ???\n\r", 10, 500);
+    }
+
     HAL_Delay(500);
     //Set the ADC to read from specific channels in setup for group mode
     //Then call Start, and poll for conversion.  GetValue into a buffer, and read for as many times as channels setup.
@@ -326,7 +357,9 @@ static void MX_I2C1_Init(void)
 {
 
   hi2c1.Instance = I2C1;
-  hi2c1.Init.Timing = 0x2000090E;
+  //hi2c1.Init.Timing = 0x2000090E;
+  hi2c1.Init.Timing = 0x1042C3C7; //Timing for 10kHz clock w/ 8Mhz osc
+  //hi2c1.Init.Timing = 0x10420F13;  //Timing for 100kHz clock w/ 8MHz osc
   hi2c1.Init.OwnAddress1 = 0;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
